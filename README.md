@@ -97,9 +97,23 @@ revert."*
 | `--n <k>` | Explicit wave size |
 
 **On cost.** A default run is ten short Haiku generations plus one Sonnet
-critique. The thing keeping it cheap is the 150-word cap on generator output, not
-the agent count — which is why `--deep` costs less than you would guess, and why
-raising the cap is the one change that will actually hurt.
+critique. An earlier version of this README claimed the 150-word output cap, not
+the agent count, was what kept it cheap, and that `--deep` therefore costs less
+than you would guess. **Measurement says the opposite.**
+
+| Wave | Measured total |
+|---|---|
+| `--n 6` | 272k tokens |
+| default `N=10` | 419k and 442k (two runs) |
+| `--deep` (`N=25`) | not run; ~1.0M projected |
+
+Roughly 37k per generator and 55–66k for the critic, near-constant per agent and
+dominated by *input*. On Claude Code a subagent cannot be spawned with its tool
+list emptied, so each generator pays for a full agent system prompt regardless of
+writing 120 words. The agent count is the cost driver; the output cap is a
+rounding error. Keep the cap anyway — raising it buys nothing — but budget
+`--deep` as a deliberate spend, not a free upgrade. On a harness that can spawn
+genuinely tool-less subagents this floor collapses; re-measure before assuming.
 
 ## Tuning notes
 
@@ -127,6 +141,48 @@ What was measured while building this, and what it changed:
 - **Honest failure is a feature.** If fewer than 2 ideas survive, the skill says
   the wave was weak and offers a re-roll. It does not pad the list to look
   productive.
+
+### Cold-start test pass, 2026-08-13
+
+The three runs above were executed by the agent that wrote the skill — the
+weakest possible test. A second agent re-ran it cold. Three runs, three problem
+shapes, all completed with no manual patching:
+
+| Run | Problem | Wave | Survived |
+|---|---|---|---|
+| 1 | co-op horror: making players *want* to leave safe light | 10 | 3 |
+| 2 | this tool's own cost problem, invoked with **no argument** | 10 | 3 |
+| 3 | solo dev drowning in unreviewed agent output (`--n 6`) | 6 | 1 |
+
+Three things that testing changed:
+
+- **The `awk` fallback was silently broken, and only on the argument path.**
+  Claude Code substitutes dollar-sign-digit tokens in a skill file with the
+  invocation's arguments. `$0` inside the fallback became the first word of the
+  user's problem statement, so the command printed blank lines instead of seeds
+  — and the likely next move for a model holding an empty seed list is to invent
+  seeds, which destroys the whole premise while still producing plausible output.
+  Never triggered in the author's runs because `shuf` exists on their machine.
+  The fallback is now written with `paste` so no such token appears in the file
+  at all, and Step 3 now requires checking that the draw actually returned seed
+  text. (The first version of the warning contained literal `$0` examples and so
+  mangled *itself*; it is now written out in words.)
+- **The cost claim was backwards**, as measured above.
+- **Run 3 hit the honest-failure path for the first time** — 1 survivor from 6 —
+  and reported it as weak rather than padding. Run 2 exercised `[SALVAGED]`,
+  which turned a mediocre idea into the best one in the wave. Both paths work.
+
+**One limitation worth knowing before you rely on this.** In run 2 the tool was
+pointed at a real problem whose correct answer was *obvious* — batch several
+seeds into one worker to amortise a fixed startup cost. Two generators found it.
+The critic killed both, correctly by its own rules, as things a competent team
+would reach in twenty minutes. The novelty filter has no channel for
+correct-but-obvious, by design. This is a complement to ordinary problem-solving
+and a bad substitute for it: run it *beside* your own thinking, never instead.
+
+Not re-tested cold: `--deep`, natural-language triggering without naming the
+skill (unverifiable from inside a session that already named it), and the
+`awk` fallback on a real macOS box without coreutils.
 
 ## The seed file
 

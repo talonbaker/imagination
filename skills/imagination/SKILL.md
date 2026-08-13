@@ -78,8 +78,23 @@ shuf -n $((2*N)) /path/to/seeds.txt
 If `shuf` is unavailable (macOS without coreutils):
 
 ```bash
-awk 'BEGIN{srand()} {print rand()"\t"$0}' /path/to/seeds.txt | sort -n | head -n $((2*N)) | cut -f2-
+awk 'BEGIN{srand()} {print rand()}' /path/to/seeds.txt | paste - /path/to/seeds.txt | sort -n | head -n $((2*N)) | cut -f2-
 ```
+
+**Do not "simplify" that back to the awk one-liner that prints the whole line
+via a dollar-sign-zero field reference.** Some harnesses substitute
+dollar-sign-digit tokens inside a skill file with the invocation's own arguments
+before you ever read it - turning that command into one that silently prints
+blank lines. The `paste` form exists so that no dollar-sign-digit token appears
+anywhere in this file, including in this warning. (Claude Code does exactly
+this; measured 2026-08-13.)
+
+**Then check what you drew.** Confirm the command actually printed `2N`
+non-empty lines of seed text before going on. A sampler that silently returns
+nothing is the one failure that breaks principle 1 while still producing
+plausible output - because the next thing a model does with an empty seed list
+is invent one. If the draw comes back short or empty, fix the command. Never
+fill the gap yourself.
 
 Pair them off in order: generator *i* gets seed *2i* as primary and seed *2i+1*
 as secondary. Never pick seeds by reading the file and choosing - that defeats
@@ -180,6 +195,25 @@ Offer to save the results to a file. Do not write the file unless asked.
 
 ## Token discipline
 
-A default run is 10 short Haiku generations plus one Sonnet critique. The 150
-word cap on generator output, more than the agent count, is what keeps it cheap.
-Do not raise the cap.
+A default run is 10 short Haiku generations plus one Sonnet critique. Keep the
+150-word output cap - but do not believe it is what makes the run cheap. That
+claim was an untested assumption and measurement contradicts it.
+
+Measured on Claude Code, 2026-08-13, where subagents **cannot** be spawned with
+their tool list emptied, so every generator carries a full agent system prompt
+no matter how little it writes:
+
+| Wave | Measured total |
+|---|---|
+| `--n 6` | 272k tokens |
+| default `N=10` | 419k and 442k tokens (two runs) |
+| `--deep` (`N=25`) | not run; ~1.0M projected |
+
+That is ~37k per generator (range 34.2k-41.2k over 20 samples) and 55-66k for
+the critic - near-constant per agent, and dominated by input, not output. So on
+this harness **the agent count is the cost driver and the output cap is a
+rounding error.** Raising the cap still buys nothing; lowering `N` is the only
+real lever. Treat `--deep` as a deliberate, expensive choice.
+
+On a harness that can spawn genuinely tool-less subagents the per-agent floor
+collapses and the original reasoning holds. Re-measure before assuming either.
