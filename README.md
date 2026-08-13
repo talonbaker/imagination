@@ -295,6 +295,33 @@ strong wave. Whether the fan-out earns its ~222k against a solo run on the same
 problem is an open empirical question, and not one to settle by assuming the
 expensive path is better.
 
+### Exclusion lists and asymmetric context, 2026-08-13
+
+One validation wave, same 4x3 shape as run E so the prompt changes were the only
+variable. 12 ideas, 3 survivors, 242k.
+
+| Change | Verdict | Evidence |
+|---|---|---|
+| ALREADY OBVIOUS list | works | three kills cite the list verbatim, incl. "a reworded instance of the benchmark's add telemetry" |
+| critic gets more context | works | those kills are the ones a blind critic cannot confidently make |
+| print the seed by each survivor | works, immediately | caught a costume the critic had passed |
+| falsifier replaces "prototype first" | works | falsifiers now name a test that can actually kill the idea |
+
+The seed-printing change paid for itself on its first run. One survivor's seed was
+"a third party holds the thing until both sides have performed" against an idea
+about injecting interference and measuring performance deltas — the seed link was
+a throwaway clause, the collision never bound, and the critic passed it anyway.
+That failure is invisible unless the seed is printed next to the idea.
+
+**The exclusion list also has a cost.** Cross-worker convergence spiked: five of
+twelve ideas landed in one mechanism family (ablate a system, observe what
+breaks) and three died as duplicates — 25% duplicate-kills against 8% in run E.
+The likely cause is the list itself: banning the eight standard answers funnels
+independent workers into the same remaining corner. One run is not enough to act
+on. If it repeats, the fix is a *shorter* list — three to five entries the user
+actually holds — rather than an exhaustive one. Thoroughness in that list is not
+free.
+
 ## The seed file
 
 `skills/imagination/seeds.txt` — 500 unique lines, each a *mechanism* (how
