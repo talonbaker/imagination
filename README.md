@@ -220,9 +220,12 @@ clock at one-second granularity, so two fallback draws inside the same second
 returned identical seeds — real-looking randomness that isn't. Now seeded
 explicitly, and verified by two same-second draws returning different seeds.
 
-Not re-tested cold: natural-language triggering without naming the skill
-(structurally unverifiable from inside a session that already named it), and the
-`awk` fallback on a real macOS box without coreutils.
+Not re-tested cold at the time: natural-language triggering without naming the
+skill (structurally unverifiable from inside a session that already named it),
+the `awk` fallback on a real macOS box without coreutils, whether the seeded
+fallback survives argument substitution *as delivered*, and a default-shape run
+after the sealed-assignment wording was strengthened. The last two are closed
+below.
 
 **A caching gotcha for anyone editing this skill.** Claude Code reads a skill
 file once per session and reuses it. Edit the file, invoke it again in the same
@@ -231,6 +234,38 @@ Any "I fixed it and retested" done in one sitting is testing the pre-edit file.
 Verified here: a re-invocation after editing served the previous body while
 `diff` confirmed the new text was on disk. Start a fresh session to test an edit,
 or execute the file's instructions from a direct read rather than the invocation.
+
+### Fresh-session verification, 2026-08-13
+
+The batched redesign was measured by the agent that built it, in a session where
+the caching gotcha above applies. That left two questions open. Both are now
+closed from a session that had never loaded the skill body.
+
+**Loader delivery: verified.** Invoking the skill served the current batched body
+— wave-shape table, three-collision worker prompt, measured cost tables — and the
+fallback line arrived intact as `awk -v seed="${RANDOM:-$$}"`. Nothing in it was
+substituted. The `paste` rewrite holds *as delivered*, not merely as written.
+
+**One more default wave, cold:**
+
+| Run | Problem | Invocation | Workers | Ideas | Survived | Tokens |
+|---|---|---|---|---|---|---|
+| E | persisting player-built structures across nights | argument | 4 | 12 | 4 | 222k |
+
+24 of 24 seeds drawn non-empty and unique, counted in the shell. All four workers
+reported zero tool calls. Kill log complete — all eight non-survivors named
+exactly once. Cost sits inside the 226k/243k band already measured.
+
+**Within-worker convergence was zero.** The wave's one duplicate kill was
+*cross*-worker: two workers who cannot see each other independently arrived at
+pay-upkeep-or-decay. That is the strengthened sealed-assignment wording holding
+on the default shape, and it is further evidence for the earlier finding — most
+apparent batch contamination is a narrow solution space rather than a worker
+riffing on itself. A duplicate kill is not automatically a batching failure, and
+reading it as one would lead you to weaken batching for no gain.
+
+Still open, unchanged: natural-language triggering without naming the skill, and
+the `awk` fallback on a real macOS box without coreutils.
 
 ## The seed file
 
