@@ -1,0 +1,4 @@
+# The skill file carries shell commands that get read and re-typed by an agent,
+# and seeds.txt is sampled line-by-line. Both must be LF everywhere, regardless
+# of the cloning machine's core.autocrlf setting.
+* text=auto eol=lf
