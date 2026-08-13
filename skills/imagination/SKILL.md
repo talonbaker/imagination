@@ -62,6 +62,25 @@ candidate solutions the user already mentioned.
 
 This brief is the only project information any generator will ever receive.
 
+### Also write the ALREADY OBVIOUS list
+
+Alongside the brief, write 3-8 short lines naming **the answers that already
+exist or that any competent team reaches in the first twenty minutes of this
+specific problem.** Include whatever the user already told you they have.
+
+This is the single highest-value input to the whole tool. The generic ban list
+in the worker prompt (gamification, chatbots, dashboards) bans nothing in most
+domains - it is a list of *someone else's* clichés. A problem-specific list is
+what actually forces a generator off the obvious path, and it gives the critic a
+real yardstick instead of its own guess at what a competent team would say.
+
+Write them as plain claims, not categories: "a bigger fire lights a bigger
+circle" beats "size-based mechanics". If the user's own request already named
+exclusions, those go in verbatim and first.
+
+Both the brief and this list go to every generator. The list also goes to the
+critic as its obviousness benchmark.
+
 ## Step 3 - Sample seeds with real RNG
 
 `seeds.txt` sits beside this file in the skill directory. Resolve its path first
@@ -144,6 +163,10 @@ you don't know. Use NO tools; answer directly.
 PROBLEM BRIEF:
 {brief}
 
+ALREADY OBVIOUS - these answers are taken. Producing any of them, or a
+rewording of one, is an automatic failure:
+{already_obvious_list}
+
 You will produce THREE ideas in this session, one per seed pair below.
 Treat each as a separate, sealed assignment:
 - Complete idea 1 fully before looking at seed pair 2, and so on.
@@ -179,10 +202,15 @@ Rules:
   failure; "it works the way X works, specifically: ..." is success.
 - Litmus test: if your idea would still make sense with seed 1 deleted,
   you have failed. Start over before answering.
-- Banned outright: any idea a competent product team would produce in
-  their first 20 minutes of ordinary brainstorming - including anything
-  centered on gamification, an AI assistant/chatbot, a dashboard,
-  notifications, social/community features, personalization, or theming.
+- Banned outright: anything on the ALREADY OBVIOUS list above, and any
+  idea a competent team would produce in their first 20 minutes of
+  ordinary brainstorming. If your domain has no specific list, the usual
+  suspects are gamification, an AI assistant/chatbot, a dashboard,
+  notifications, social/community features, personalization, theming.
+- State, in one clause inside WHY NON-OBVIOUS, which ALREADY OBVIOUS
+  entry your idea is most likely to be mistaken for, and why it is not
+  that. If you cannot name one, your idea is probably too far from the
+  problem to be useful.
 - Do not evaluate feasibility. Do not add caveats. Commit to the bit.
 
 Output exactly this per idea, 150 words maximum each, nothing before or
@@ -201,9 +229,14 @@ match.
 
 ## Step 4b - Solo mode, when workers cannot be spawned
 
-Some sessions cannot dispatch subagents at all - an exploring/no-dispatch rule,
-a harness limit, a policy against fan-out. **Do not silently run the pipeline in
-your own context and report it as a normal wave.** That produces the same
+Many sessions cannot dispatch subagents - a project rule that keeps exploration
+separate from orchestration, a harness limit, a policy against fan-out. **Treat
+this as a main path, not an exotic edge case.** The moment someone reaches for
+this tool is usually mid-conversation while stuck, which in a lot of workflows is
+exactly the mode that forbids dispatching. Expect solo mode to run often.
+
+What is never acceptable is running it undisclosed. **Do not silently run the
+pipeline in your own context and report it as a normal wave.** That produces the same
 headline number from a materially weaker process, which is the one failure this
 tool exists to not commit.
 
@@ -232,7 +265,16 @@ override is unsupported). **Flatten every worker's ideas into a single numbered
 list first.** The critic must not know which worker produced what, so that
 convergence gets judged on the merits rather than excused by provenance.
 
-Give it the brief plus the flattened list, and exactly this:
+**The critic gets more context than the generators, deliberately.** Principle 2
+says solution context drags ideas back to the obvious - that is a fact about
+*generation*, not about *judgment*. A blind critic cannot make the single most
+valuable kill there is: "you already have this under a different name." So give
+the critic the ALREADY OBVIOUS list and, if you have it, a short note on what
+already exists or has been tried. It uses that for the obviousness and duplicate
+tests only, never to soften a kill on feasibility grounds.
+
+Give it the brief, the ALREADY OBVIOUS list, and the flattened list, then
+exactly this:
 
 ```
 You are the sole gatekeeper for a forced-collision ideation pipeline. You
@@ -243,8 +285,10 @@ produced no working mechanism. Return only the survivors: at most 4, and
 fewer if fewer deserve it. An empty result is an acceptable result.
 
 Apply these tests to each idea, in order:
-1. OBVIOUSNESS: would this appear in the first 20 ideas from a competent
-   team brainstorming without seeds? Kill it.
+1. OBVIOUSNESS: is this on the ALREADY OBVIOUS list, a rewording of an
+   entry on it, or something a competent team would reach in their first
+   20 minutes on this specific problem? Kill it. The list is your
+   benchmark - use it before your own intuition about what is obvious.
 2. COSTUME: mentally delete the seed language. Is what remains a standard
    idea? Kill it.
 3. KERNEL: if the idea is incoherent, does one live insight survive? If
@@ -259,7 +303,10 @@ Score surprise and mechanism, never feasibility or polish. Do not pad a
 weak wave to reach a count; say the wave was weak instead.
 
 For each survivor output: name; mechanism (tightened by you); why it is
-non-obvious, one sentence; what to prototype first, one sentence.
+non-obvious, one sentence; and THE FIRST THING THAT WOULD FALSIFY IT -
+name the load-bearing assumption and the cheapest test that could kill
+the idea, in one sentence. Not a generic first step: the thing that, if
+it came out wrong, means do not build this at all.
 
 Then, after the survivors, list every idea you did not keep:
 
@@ -273,6 +320,12 @@ Every idea you did not keep must appear there exactly once.
 
 Relay the critic's survivors to the user. Add one line giving the wave size and
 kill rate, e.g. `12 generated, 3 survived.`
+
+**Print the seed that produced each survivor, beside it.** One line, the seed
+text verbatim. This is not decoration: it is the only way the reader can audit
+whether the collision actually bound, or whether the seed was worn as costume
+and the critic missed it. It also teaches the reader what a productive seed looks
+like, which is what makes them able to extend `seeds.txt` themselves.
 
 Then relay the kill log verbatim, under a short heading: `Killed, for the
 record`. This is presentation only - it changes nothing about what survives.
