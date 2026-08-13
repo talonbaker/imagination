@@ -96,24 +96,40 @@ revert."*
 | `--deep` | 25 generators. For when a default wave came back weak, or the problem is worth real money |
 | `--n <k>` | Explicit wave size |
 
-**On cost.** A default run is ten short Haiku generations plus one Sonnet
-critique. An earlier version of this README claimed the 150-word output cap, not
-the agent count, was what kept it cheap, and that `--deep` therefore costs less
-than you would guess. **Measurement says the opposite.**
+**On cost.** Cost is per *worker* and almost flat, so the same idea count from
+fewer workers is a near-proportional saving. That is why a worker carries three
+collisions rather than one.
 
-| Wave | Measured total |
-|---|---|
-| `--n 6` | 272k tokens |
-| default `N=10` | 419k and 442k (two runs) |
-| `--deep` (`N=25`) | not run; ~1.0M projected |
+| Wave | Workers | Ideas | Measured total |
+|---|---|---|---|
+| `--n 8` | 3 | 8 | 183k |
+| default | 4 | 12 | 226k, 243k (two runs) |
+| `--deep` | 8 | 24 | 424k |
 
-Roughly 37k per generator and 55–66k for the critic, near-constant per agent and
-dominated by *input*. On Claude Code a subagent cannot be spawned with its tool
-list emptied, so each generator pays for a full agent system prompt regardless of
-writing 120 words. The agent count is the cost driver; the output cap is a
-rounding error. Keep the cap anyway — raising it buys nothing — but budget
-`--deep` as a deliberate spend, not a free upgrade. On a harness that can spawn
-genuinely tool-less subagents this floor collapses; re-measure before assuming.
+A one-collision worker costs ~37k; a three-collision worker ~42k. Three ideas for
+14% more than one is the entire argument. On Claude Code a subagent cannot be
+spawned with its tool list emptied, so each worker pays for a full agent system
+prompt regardless of writing 400 words — the cost is *input*, and the 150-word
+cap exists for critic legibility, not economy. Keep it anyway; raising it buys
+nothing.
+
+The pre-batch design spent 419k and 442k to produce *ten* ideas. `--deep` now
+returns 24 for less than that.
+
+`--deep` buys more shots on goal, not more survivors — the critic caps output at
+4 either way, and the 24-idea wave measured here returned fewer survivors (2)
+than a 12-idea wave (3). Reach for it when a default wave came back weak.
+
+**The batch trade, stated plainly.** Three ideas from one worker risks
+*within-worker contamination* — idea 2 quietly restating idea 1's mechanism in a
+new wrapper. Two guards contain it: sealed-assignment rules in the worker prompt
+(complete each idea before reading the next seed pair; restate prior mechanisms
+and re-derive on convergence) and the critic's duplicate test, which sees all
+ideas flattened and unattributed so convergence cannot be excused by provenance.
+Measured across the four retest runs: one worker in four converged in the first
+run, one in eight after the sealed-assignment wording was strengthened.
+Cross-worker duplicates appeared at similar rates, which says most convergence
+is driven by narrow problems rather than by batching.
 
 ## Tuning notes
 
@@ -180,9 +196,41 @@ would reach in twenty minutes. The novelty filter has no channel for
 correct-but-obvious, by design. This is a complement to ordinary problem-solving
 and a bad substitute for it: run it *beside* your own thinking, never instead.
 
-Not re-tested cold: `--deep`, natural-language triggering without naming the
-skill (unverifiable from inside a session that already named it), and the
+That answer turned out to be right, and it is now how the tool works — which is
+exactly why the **kill log** exists. Every non-survivor is reported back in one
+line with its kill reason (`obvious`, `costume`, `no-kernel`, `duplicate`). It
+changes nothing about what survives; it just means the correct-but-obvious answer
+gets named on its way out instead of vanishing. If the thing you actually needed
+is in that list, the tool still found it for you.
+
+### Batched waves, 2026-08-13
+
+Cost measurement drove a redesign: one worker now carries three collisions
+instead of one. Four cold runs after the change, all completing unassisted:
+
+| Run | Problem | Invocation | Workers | Ideas | Survived | Tokens |
+|---|---|---|---|---|---|---|
+| A | co-op horror: wanting to leave safe light | argument | 4 | 12 | 3 | 226k |
+| B | this skill's own stale-cache problem | **no argument** | 4 | 12 | 2 | 243k |
+| C | judging your own work with fresh eyes | `--n 8` | 3 | 8 | 3 | 183k |
+| D | indie launch visibility | `--deep` | 8 | 24 | 2 | 424k |
+
+Also found and fixed in the same pass: `awk`'s bare `srand()` seeds from the
+clock at one-second granularity, so two fallback draws inside the same second
+returned identical seeds — real-looking randomness that isn't. Now seeded
+explicitly, and verified by two same-second draws returning different seeds.
+
+Not re-tested cold: natural-language triggering without naming the skill
+(structurally unverifiable from inside a session that already named it), and the
 `awk` fallback on a real macOS box without coreutils.
+
+**A caching gotcha for anyone editing this skill.** Claude Code reads a skill
+file once per session and reuses it. Edit the file, invoke it again in the same
+session, and you silently get the *old* version — the run looks entirely normal.
+Any "I fixed it and retested" done in one sitting is testing the pre-edit file.
+Verified here: a re-invocation after editing served the previous body while
+`diff` confirmed the new text was on disk. Start a fresh session to test an edit,
+or execute the file's instructions from a direct read rather than the invocation.
 
 ## The seed file
 
