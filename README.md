@@ -264,8 +264,36 @@ apparent batch contamination is a narrow solution space rather than a worker
 riffing on itself. A duplicate kill is not automatically a batching failure, and
 reading it as one would lead you to weaken batching for no gain.
 
-Still open, unchanged: natural-language triggering without naming the skill, and
-the `awk` fallback on a real macOS box without coreutils.
+Still open: the `awk` fallback on a real macOS box without coreutils.
+
+### Natural-language triggering, and solo mode, 2026-08-13
+
+**Triggering: passed.** A fresh session was given a plain request that never
+named the skill and never used the slash command — *"I'm stuck on something and
+could use a fresh angle... everything I come up with lands on the same three
+jobs"* — and the skill fired on the `description` alone. The prompt deliberately
+avoided the description's own phrasings, since a request quoting them back tests
+nothing.
+
+**That run also exposed a real defect.** The session could not dispatch
+subagents, so it ran the whole pipeline in its own context and reported the
+ordinary `12 generated, 4 survived` line. Seeds were genuinely drawn, so
+principle 1 held — but there were no isolated workers, which means principle 2
+was gone entirely: the "generators" could see the whole conversation and project,
+the exact solution context the design exists to withhold. Nothing in the output
+disclosed any of this.
+
+The fault was the file's, not the agent's: SKILL.md had no defined behaviour for
+"I cannot spawn workers," so the agent improvised a reasonable-looking one. Step
+4b now defines solo mode explicitly — draw seeds the same way, work one pair at
+a time without reading ahead, run the critic as a separate pass, and **label the
+result as solo mode with one line naming what was weakened.** Solo mode is a
+legitimate fallback. Running it undisclosed is not.
+
+Worth noting for anyone tuning this: that undisclosed solo run produced a
+strong wave. Whether the fan-out earns its ~222k against a solo run on the same
+problem is an open empirical question, and not one to settle by assuming the
+expensive path is better.
 
 ## The seed file
 

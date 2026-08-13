@@ -199,6 +199,32 @@ A worker handed fewer than three pairs (the remainder worker on some `--n`
 values) produces that many ideas - drop the unused pairs and change "THREE" to
 match.
 
+## Step 4b - Solo mode, when workers cannot be spawned
+
+Some sessions cannot dispatch subagents at all - an exploring/no-dispatch rule,
+a harness limit, a policy against fan-out. **Do not silently run the pipeline in
+your own context and report it as a normal wave.** That produces the same
+headline number from a materially weaker process, which is the one failure this
+tool exists to not commit.
+
+If you cannot spawn workers, run solo mode and say so:
+
+- Draw the seeds exactly as in Step 3. Real RNG is non-negotiable and costs
+  nothing here, so principle 1 still holds fully.
+- Work one seed pair at a time. **Do not read ahead.** Write each idea out
+  completely before looking at the next pair - the sealed-assignment discipline
+  applied to yourself, since there is no isolation to enforce it for you.
+- Run the critic as a genuinely separate pass over the flattened list, judging
+  the ideas as text rather than as things you remember writing.
+- Label the result honestly in Step 6: `12 generated in solo mode, 4 survived`,
+  followed by one line naming what was weakened - the ideas were not written
+  blind, so they can drift toward what the session already knows and converge
+  more than isolated workers would.
+
+Solo mode is a legitimate fallback, not a failure. It is only a failure when it
+is not disclosed. A user who is told gets to weigh the ideas accordingly; a user
+who is not told believes they received something they did not.
+
 ## Step 5 - The critic
 
 One subagent, `model: sonnet` (or the session model if that is stronger or the
