@@ -141,7 +141,8 @@ THRESHOLDS = {
     "cluster_share": 0.4,    # share of ideas in the largest lexical cluster
     "prev_overlap": 0.67,    # share of this batch's recurring themes seen in the last two batches
     "dup_rate": 0.3,         # share of ideas pruned by code as duplicates
-    "kind_share": 0.6,       # share of judged ideas of one kind (device, ritual, ...)
+    "kind_share": 0.7,       # share of judged ideas of one kind (device, ritual, ...)
+    "kind_min": 4,           # ... and at least this many of them
     "cluster_link": 0.22,    # jaccard that links two ideas into a cluster
     "min_ideas": 5,
 }
@@ -233,7 +234,7 @@ def convergence(batch_apples, prev_batches_apples, critic_flag=False, thresholds
             signals.append("repeat")
         if m["dup_rate"] >= th["dup_rate"]:
             signals.append("duplicates")
-        if judged and m["kind_share"] >= th["kind_share"]:
+        if judged and m["kind_share"] >= th["kind_share"] and top_kind_n >= th["kind_min"]:
             signals.append("kind")
     if critic_flag:
         signals.append("critic")
