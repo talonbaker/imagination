@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}} - imagination tree</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#1d1d1b;--muted:#6b6a65;--line:#dedbd2;--card:#ffffff;--accent:#2f5d8a;
+--kept:#9a6b00;--alive:#2e7d32;--pruned:#a33;--wall:#7a7a7a;--hl:#fff3c4;--sel:#e7f0fa}
+@media (prefers-color-scheme:dark){:root{--bg:#16171a;--fg:#e8e6e1;--muted:#9a988f;--line:#33353b;
+--card:#1e2024;--accent:#8db8e8;--kept:#e0b44c;--alive:#7cc47f;--pruned:#e07a7a;--wall:#8f8f8f;
+--hl:#3b3520;--sel:#1f2d3d}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:16px 20px;border-bottom:1px solid var(--line)}
+h1{font-size:20px;margin:0 0 4px}
+.ro{font-size:13px;color:var(--muted)}
+.bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:10px;font-size:14px}
+.bar label{cursor:pointer;user-select:none}
+button{font:inherit;font-size:13px;padding:3px 10px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:6px;cursor:pointer}
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,420px);gap:0;min-height:calc(100vh - 220px)}
+@media (max-width:820px){main{grid-template-columns:1fr}}
+#tree{padding:14px 20px 120px;overflow-wrap:anywhere}
+#detail{border-left:1px solid var(--line);padding:16px 18px 120px;background:var(--card)}
+@media (max-width:820px){#detail{border-left:0;border-top:1px solid var(--line)}}
+details{margin:2px 0 2px 0}
+details>summary{cursor:pointer;list-style:none;padding:2px 0;color:var(--muted);font-size:13px}
+details>summary::before{content:"\25b8 ";}
+details[open]>summary::before{content:"\25be ";}
+.kids{margin-left:20px;border-left:1px dashed var(--line);padding-left:10px}
+.node{display:flex;gap:8px;align-items:baseline;padding:2px 4px;border-radius:5px}
+.node:hover{background:var(--sel)}
+.node.on{background:var(--hl)}
+.node .id{font:12px ui-monospace,Menlo,monospace;color:var(--muted);min-width:34px}
+.node .h{cursor:pointer}
+.g{width:1em;text-align:center}
+.kept .g{color:var(--kept)} .alive .g{color:var(--alive)} .pruned .g{color:var(--pruned)} .wall .g{color:var(--wall)}
+.pruned .h{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.reason{font-size:12px;color:var(--pruned)}
+.conv{font-size:13px;color:var(--kept);margin:2px 0 4px 18px}
+.root{font-weight:600;font-size:16px}
+#detail h2{font-size:17px;margin:0 0 8px}
+#detail dl{margin:0;display:grid;grid-template-columns:90px 1fr;gap:4px 10px;font-size:13.5px}
+#detail dt{color:var(--muted)}
+#detail dd{margin:0}
+.lin{font:12.5px ui-monospace,Menlo,monospace;white-space:pre-wrap;margin-top:12px;color:var(--muted)}
+#tray{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 20px;font-size:13.5px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+#tray code{flex:1 1 300px;font:13px ui-monospace,Menlo,monospace;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);min-height:30px;user-select:all}
+.acts{display:inline-flex;gap:2px;margin-left:4px}
+.acts button{padding:0 6px;font-size:11px;opacity:.55}
+.node:hover .acts button,.acts button.on{opacity:1}
+.acts button.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.brief{white-space:pre-wrap;font-size:13px;color:var(--muted);max-width:900px}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title"></h1>
+  <div class="ro">Read-only view. This page cannot change anything on disk. Mark apples below, then paste the command in the tray into the chat (for example <code>/imagination keep a3 ; grow a7</code>).</div>
+  <details><summary>brief</summary><div class="brief" id="brief"></div></details>
+  <div class="bar">
+    <span>show:</span>
+    <label><input type="checkbox" data-f="kept" checked> &#9733; kept</label>
+    <label><input type="checkbox" data-f="alive" checked> &#9679; alive</label>
+    <label><input type="checkbox" data-f="pruned"> &#10005; pruned</label>
+    <label><input type="checkbox" data-f="wall" checked> &#9642; wall</label>
+    <button id="expand">expand all</button><button id="collapse">collapse all</button>
+  </div>
+</header>
+<main>
+  <div id="tree"></div>
+  <aside id="detail"><p class="ro">Click a headline to see what is behind it: pressure, seeds, bridge, spark, decoy result, the critic's verdict, and its lineage.</p></aside>
+</main>
+<div id="tray"><span>Selection:</span><code id="cmd"></code><button id="copy">copy</button><button id="clear">clear</button></div>
+<script id="data" type="application/json">/*DATA*/null</script>
+<script>
+(function(){
+var D=JSON.parse(document.getElementById('data').textContent);
+var N={};D.nodes.forEach(function(n){N[n.id]=n;});
+var G={kept:'★',alive:'●',pruned:'✕',pending:'○',wall:'▪'};
+var sel={};
+function el(t,c,txt){var e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e;}
+document.getElementById('title').textContent=D.title;
+document.getElementById('brief').textContent=D.brief;
+function kids(id){return D.nodes.filter(function(n){return n.parent===id;}).map(function(n){return n.id;});}
+function anc(id){var out=[];var n=N[id];while(n&&n.parent){out.push(n.parent);n=N[n.parent];}if(N[id]&&N[id].nearest)out.push(N[id].nearest);return out;}
+function desc(id){var out=[];var st=kids(id);while(st.length){var k=st.pop();out.push(k);st=st.concat(kids(k));}return out;}
+function nodeRow(n){
+  var r=el('div','node '+n.status);r.dataset.id=n.id;r.dataset.status=n.status==='pending'?'alive':n.status;
+  r.appendChild(el('span','g',G[n.status]||'?'));r.appendChild(el('span','id',n.id));
+  var h=el('span','h',n.headline);h.onclick=function(){detail(n.id);};r.appendChild(h);
+  if(n.status==='pruned'&&n.reason)r.appendChild(el('span','reason','['+n.reason+']'));
+  if(n.type==='apple'){var a=el('span','acts');['keep','kill','grow','revive'].forEach(function(v){
+    var b=el('button',null,v);b.onclick=function(e){e.stopPropagation();toggle(n.id,v,b);};a.appendChild(b);});r.appendChild(a);}
+  return r;}
+function batchBlock(b){
+  var d=el('details');d.open=true;var s=el('summary',null,b.summary);d.appendChild(s);
+  var k=el('div','kids');
+  if(b.convergence)k.appendChild(el('div','conv',b.convergence));
+  b.apples.forEach(function(id){var n=N[id];if(!n)return;k.appendChild(nodeRow(n));
+    D.batches.forEach(function(c){if(c.kind==='grow'&&c.parent===id){var w=el('div','kids');w.appendChild(batchBlock(c));k.appendChild(w);}});});
+  d.appendChild(k);return d;}
+function build(){
+  var t=document.getElementById('tree');t.innerHTML='';
+  t.appendChild(el('div','root','? '+D.title));
+  var top=el('div','kids');
+  var w=el('details');w.open=false;w.appendChild(el('summary',null,'Wall: obvious answers and your attempts ('+D.nodes.filter(function(n){return n.type==='wall';}).length+')'));
+  var wk=el('div','kids');D.nodes.filter(function(n){return n.type==='wall';}).forEach(function(n){wk.appendChild(nodeRow(n));});
+  w.appendChild(wk);top.appendChild(w);
+  D.batches.forEach(function(b){if(b.kind==='fresh')top.appendChild(batchBlock(b));});
+  t.appendChild(top);filter();}
+function filter(){
+  var on={};document.querySelectorAll('[data-f]').forEach(function(c){on[c.dataset.f]=c.checked;});
+  document.querySelectorAll('.node').forEach(function(r){r.style.display=on[r.dataset.status]?'':'none';});}
+function detail(id){
+  var n=N[id];var d=document.getElementById('detail');d.innerHTML='';
+  d.appendChild(el('h2',null,n.id+'  '+n.headline));
+  var dl=el('dl');
+  function row(k,v){if(v==null||v==='')return;dl.appendChild(el('dt',null,k));dl.appendChild(el('dd',null,String(v)));}
+  row('status',n.status+(n.pruned_by?' (by '+n.pruned_by+')':''));
+  row('teaser',n.teaser);row('pressure',n.operator?(n.operator+' / tone: '+n.register):n.source);
+  (n.seeds||[]).forEach(function(s){row(s.role,s.text+'  ['+s.pool+']');});
+  row('mechanism',n.mechanism);row('bridge',n.bridge);row('spark',n.spark);row('kernel',n.kernel);
+  if(n.decoy)row('decoy',n.decoy.pass==null?'n/a':(n.decoy.pass?'pass':'fail')+' (picked '+n.decoy.picked+', answer '+n.decoy.answer+')');
+  row('critic',n.verdict?(n.verdict+' / '+n.reason+' - '+(n.note||'')):'');
+  row('kind',n.kind);row('feasibility',n.feasibility);row('motifs',(n.motifs||[]).join(', '));
+  row('prior art',n.prior_art);row('cf',n.cf);row('flags',(n.flags||[]).join(', '));
+  if(n.deepen){row('deep bridge',n.deepen.bridge);row('try first',n.deepen.prototype_first);row('likely wrong',n.deepen.likely_wrong);}
+  d.appendChild(dl);d.appendChild(el('div','lin',(n.lineage||[]).join('\n')));
+  var mark={};mark[id]=1;anc(id).forEach(function(a){mark[a]=1;});desc(id).forEach(function(a){mark[a]=1;});
+  document.querySelectorAll('.node').forEach(function(r){r.classList.toggle('on',!!mark[r.dataset.id]);});}
+function toggle(id,verb,btn){
+  if(sel[id]===verb){delete sel[id];}else{sel[id]=verb;}
+  document.querySelectorAll('.node[data-id="'+id+'"] .acts button').forEach(function(b){b.classList.toggle('on',sel[id]===b.textContent);});
+  cmd();}
+function cmd(){
+  var by={keep:[],kill:[],revive:[],grow:[]};Object.keys(sel).forEach(function(k){by[sel[k]].push(k);});
+  var parts=[];['keep','kill','revive'].forEach(function(v){if(by[v].length)parts.push(v+' '+by[v].join(' '));});
+  by.grow.forEach(function(g){parts.push('grow '+g);});
+  document.getElementById('cmd').textContent=parts.join(' ; ');}
+document.querySelectorAll('[data-f]').forEach(function(c){c.onchange=filter;});
+document.getElementById('expand').onclick=function(){document.querySelectorAll('details').forEach(function(d){d.open=true;});};
+document.getElementById('collapse').onclick=function(){document.querySelectorAll('#tree details').forEach(function(d){d.open=false;});};
+document.getElementById('clear').onclick=function(){sel={};document.querySelectorAll('.acts button').forEach(function(b){b.classList.remove('on');});cmd();};
+document.getElementById('copy').onclick=function(){var t=document.getElementById('cmd').textContent;
+  if(navigator.clipboard&&t)navigator.clipboard.writeText(t).catch(function(){});
+  var r=document.createRange();r.selectNodeContents(document.getElementById('cmd'));var s=window.getSelection();s.removeAllRanges();s.addRange(r);};
+build();
+})();
+</script>
+</body>
+</html>

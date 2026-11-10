@@ -1,0 +1,17 @@
+# Registers: the tone an idea is written in. Cheap extra variety; reuse is allowed.
+deadpan-serious
+gleeful
+villainous
+childlike
+bureaucratic
+mythic
+conspiratorial
+tender
+noir detective
+sports commentator
+liturgical
+door-to-door salesman
+dry scientific paper
+nursery rhyme
+militant manifesto
+lazy and unbothered
