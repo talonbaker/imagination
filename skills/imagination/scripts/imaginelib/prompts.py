@@ -229,8 +229,9 @@ def worker_prompt(brief, wall_headlines, banned_motifs, assigns, ops_by_id, grow
         % (k, "" if k == 1 else "s", BANNED_CORES))
     for a in assigns:
         op = ops_by_id[a["operator"]]
-        parts.append("ASSIGNMENT %d - pressure: %s - tone: %s\n%s"
-                     % (a["slot"], op["name"], a["register"], seed_line(a, op)))
+        parts.append("ASSIGNMENT %d - pressure: %s\n%s\n(Tone for the headline only: %s. The tone is "
+                     "never the source of the idea; the idea comes from the pressure and seed above.)"
+                     % (a["slot"], op["name"], seed_line(a, op), a["register"]))
     parts.append(
         "OUTPUT: JSON {\"ideas\": [...]}, one object per assignment with:\n"
         "- slot: the assignment number\n"
@@ -254,7 +255,7 @@ def decoy_prompt(items):
     return "\n".join(lines)
 
 
-def critic_prompt(brief, wall_lines, cands, kinds, grow=None, fix_queue=None):
+def critic_prompt(brief, wall_lines, cands, kinds, grow=None, fix_queue=None, seen_motifs=None):
     parts = ["PROBLEM BRIEF\n" + brief]
     parts.append("THE WALL: everything the human can already reach - obvious answers, their own "
                  "attempts, and every idea shown in earlier rounds (with what happened to it).\n"
@@ -262,6 +263,9 @@ def critic_prompt(brief, wall_lines, cands, kinds, grow=None, fix_queue=None):
     if grow:
         parts.append("These candidates were grown from parent %s \"%s\" (spark: %s). Kill any "
                      "near-copy of the parent with reason near-copy." % (grow["id"], grow["headline"], grow["spark"]))
+    if seen_motifs:
+        parts.append("THEMES SEEN SO FAR (motif tags from earlier rounds, most frequent first): "
+                     + ", ".join(seen_motifs))
     parts.append("CANDIDATES\n" + "\n\n".join(cands))
     parts.append(
         "Judge every candidate, in order:\n"
@@ -281,17 +285,20 @@ def critic_prompt(brief, wall_lines, cands, kinds, grow=None, fix_queue=None):
         "masked, picked the real seed out of three - a real structural link. decoy=fail means "
         "they could not - suspect costume or smooth talk. flags are code heuristics (smooth = "
         "abstraction words in the bridge; bridge-unanchored = bridge shares no words with the "
-        "seed). Evidence, not verdicts.\n"
+        "seed). Evidence, not verdicts. Also check the idea is built from its listed seed: an idea "
+        "that ignored its seed and riffed on something else is costume.\n"
         "Keep what would knock a stuck person loose: an unexpected idea with a hidden bridge "
         "back to the problem. Absurd, wrong or unbuildable ideas can be keeps. Feasibility is a "
         "tag, never a reason. Never keep to reach a count; an empty keep list is fine.\n\n"
         "For EVERY candidate (kept or killed) return: id; verdict keep|salvage|kill; reason "
         "(none if kept); note (one short clause: why); prior_art and cf (empty if none); "
         "headline (at most 8 words; rewrite only if the worker's headline needs explaining or "
-        "is over 8 words; keep it strange - never make it more sensible); teaser (at most 25 "
+        "is over 8 words; keep it strange - never make it more sensible); teaser (at most 20 "
         "words); spark (one sentence: the underlying connection that makes it work - what "
-        "would survive if every noun changed); motifs (1-3 lowercase tags of 1-2 words for its "
-        "theme); kind (one of: %s); feasibility easy|hard|impossible|unknown; nearest (id of the "
+        "would survive if every noun changed); motifs (1-3 lowercase tags of 1-3 words naming the "
+        "underlying MOVE, not the surface - e.g. 'hide the number', 'delay the verdict', 'move "
+        "authority', 'physical token' rather than 'melting ice' or 'kitchen'; give ideas that share "
+        "a move the same tag, and reuse a tag from THEMES SEEN SO FAR when it fits); kind (one of: %s); feasibility easy|hard|impossible|unknown; nearest (id of the "
         "wall item or earlier idea it most resembles, or empty).\n"
         "Then batch_note: one line on whether this batch circles one theme, and converged: "
         "true if it does." % ", ".join(kinds))

@@ -41,6 +41,7 @@ def usage_record(kind, model, u, secs, backend):
     rec = {"call": kind, "model": model, "backend": backend,
            "in": u.get("input_tokens", 0), "cache_create": u.get("cache_creation_input_tokens", 0),
            "cache_read": u.get("cache_read_input_tokens", 0), "out": u.get("output_tokens", 0),
+           "thinking": (u.get("output_tokens_details") or {}).get("thinking_tokens", 0),
            "secs": round(secs, 1)}
     rec["total"] = rec["in"] + rec["cache_create"] + rec["cache_read"] + rec["out"]
     return rec

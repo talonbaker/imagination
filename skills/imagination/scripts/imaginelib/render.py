@@ -62,6 +62,9 @@ def batch_report(st, bid):
         out.append("  killed, for the record:")
         for a in killed:
             out.append("    ✕ %-4s %s  [%s: %s]" % (a["id"], headline(a), a.get("reason"), a.get("note", "")))
+    dropped = (b.prefilter or {}).get("dropped", 0)
+    if dropped:
+        out.append("  %d of %d assignments came back empty from the workers (not padded)." % (dropped, b.plan["n"]))
     if dups:
         out.append("  %d near-copies dropped by code before judging: %s" % (
             len(dups), ", ".join("%s~%s" % (a["id"], a.get("dup_of")) for a in dups)))
@@ -225,7 +228,8 @@ def tree_md(st, show_all=False):
 
 
 # ---- tree.html ----------------------------------------------------------------
-def html_data(st):
+def html_data(st, names=None):
+    names = names or {}
     nodes = []
     for nid in st.wall_ids + st.apple_ids:
         n = st.nodes[nid]
@@ -236,6 +240,8 @@ def html_data(st):
                                       "deepen") if n.get(k) is not None}
         keep["headline"] = headline(n)
         keep["lineage"] = lineage(st, nid)
+        if n.get("operator"):
+            keep["operator"] = names.get(n["operator"], n["operator"])
         nodes.append(keep)
     batches = []
     for bid in st.batch_order:
@@ -249,8 +255,8 @@ def html_data(st):
     return {"title": title(st), "brief": st.brief, "nodes": nodes, "batches": batches}
 
 
-def tree_html(st):
-    data = json.dumps(html_data(st), ensure_ascii=False).replace("</", "<\\/")
+def tree_html(st, names=None):
+    data = json.dumps(html_data(st, names), ensure_ascii=False).replace("</", "<\\/")
     tpl_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tree_template.html")
     with open(tpl_path, encoding="utf-8") as f:
         tpl = f.read()
@@ -268,8 +274,8 @@ def _atomic_write(path, text):
     os.replace(tmp, path)
 
 
-def write_all(d, st):
+def write_all(d, st, names=None):
     if not st.problem:
         return
     _atomic_write(os.path.join(d, "tree.md"), tree_md(st))
-    _atomic_write(os.path.join(d, "tree.html"), tree_html(st))
+    _atomic_write(os.path.join(d, "tree.html"), tree_html(st, names))

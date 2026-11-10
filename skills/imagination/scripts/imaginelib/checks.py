@@ -105,8 +105,8 @@ def cap_headline(h):
     h = " ".join((h or "").split()).strip(" .")
     if word_count(h) <= HEADLINE_MAX_WORDS and len(h) <= HEADLINE_MAX_CHARS:
         return h, False
-    first = re.split(r"\s*[:;,(—]\s*|\s+-\s+", h)[0].strip()
-    if 2 <= word_count(first) <= HEADLINE_MAX_WORDS and len(first) <= HEADLINE_MAX_CHARS:
+    first = re.split(r"\s*[:;,(\u2014]\s*|\s+-\s+|(?<=[.!?])\s+", h)[0].strip(" .")
+    if 3 <= word_count(first) <= HEADLINE_MAX_WORDS and len(first) <= HEADLINE_MAX_CHARS:
         return first, True
     words = h.split()[:HEADLINE_MAX_WORDS]
     while words and len(" ".join(words)) > HEADLINE_MAX_CHARS:
@@ -141,6 +141,7 @@ THRESHOLDS = {
     "cluster_share": 0.4,    # share of ideas in the largest lexical cluster
     "prev_overlap": 0.67,    # share of this batch's recurring themes seen in the last two batches
     "dup_rate": 0.3,         # share of ideas pruned by code as duplicates
+    "kind_share": 0.6,       # share of judged ideas of one kind (device, ritual, ...)
     "cluster_link": 0.22,    # jaccard that links two ideas into a cluster
     "min_ideas": 5,
 }
@@ -214,6 +215,10 @@ def convergence(batch_apples, prev_batches_apples, critic_flag=False, thresholds
     m["dup_rate"] = round(dups / n, 2) if n else 0.0
     ops = Counter(a.get("operator") for a in batch_apples)
     m["operators_used"] = len(ops)
+    kinds = Counter(a.get("kind") for a in judged if a.get("kind"))
+    top_kind, top_kind_n = kinds.most_common(1)[0] if kinds else (None, 0)
+    m["kind_share"] = round(top_kind_n / len(judged), 2) if judged else 0.0
+    m["top_kind"] = top_kind
     alive = sum(1 for a in batch_apples if a.get("status") in ("alive", "kept"))
     m["keep_rate"] = round(alive / n, 2) if n else 0.0
     dec = [a["decoy"]["pass"] for a in batch_apples
@@ -228,12 +233,19 @@ def convergence(batch_apples, prev_batches_apples, critic_flag=False, thresholds
             signals.append("repeat")
         if m["dup_rate"] >= th["dup_rate"]:
             signals.append("duplicates")
+        if judged and m["kind_share"] >= th["kind_share"]:
+            signals.append("kind")
     if critic_flag:
         signals.append("critic")
     # the critic's opinion alone is not enough; it needs one measured signal too
     converging = bool([s for s in signals if s != "critic"]) or (
         "critic" in signals and n >= th["min_ideas"] and m["theme_share"] >= th["theme_share"] * 0.75)
-    ban = [theme_label(judged, t) for t, c in tc.most_common(4) if c >= 2]
+    ban = []
+    for t, c in tc.most_common(6):
+        lab = theme_label(judged, t)
+        if c >= 2 and lab not in ban:
+            ban.append(lab)
+    ban = ban[:4]
     return {"metrics": m, "signals": signals, "converging": converging, "ban": ban}
 
 
@@ -246,6 +258,8 @@ def convergence_message(res):
         parts.append("%d%% of the batch is one lexical cluster" % round(100 * m["cluster_share"]))
     if "repeat" in res["signals"]:
         parts.append("most recurring themes repeat the last two batches")
+    if "kind" in res["signals"]:
+        parts.append("%d%% of ideas are the same kind ('%s')" % (round(100 * m["kind_share"]), m["top_kind"]))
     if "duplicates" in res["signals"]:
         parts.append("%d%% were near-copies of earlier ideas" % round(100 * m["dup_rate"]))
     ban = ", ".join(res["ban"][:4]) or "the top themes"

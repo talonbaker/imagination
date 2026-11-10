@@ -1,288 +1,171 @@
 # imagination
 
-A Claude Code skill that returns 2–4 genuinely non-obvious ideas for a problem,
-instead of the ideas any competent team would already have had by lunch.
+A Claude Code skill for when you have stared at a problem so long you have gone
+nose-blind to it. It does not try to give you the right answer. It throws strange,
+headline-sized angles at the problem, drawn from outside the model's habits, and lets
+your gut pick the ones that knock you loose. You keep, kill, or grow them, and it
+remembers everything.
 
-It works by forcing a collision. Ten isolated generators each receive the same
-short problem brief plus **two random mechanism-phrases drawn from a file of 500**
-— things like *"reefs grow by building on the skeletons of their own dead"* or
-*"the winner pays the second-highest price, which makes honest bidding optimal."*
-Each generator must build its idea's core mechanism out of its seed. Then a
-single critic kills everything that is secretly obvious or structurally empty,
-and returns only what survives.
+```
+b1 · fresh · 12 ideas → 7 alive · 9 pressures
+  ● a3   Can I have one minute of your money?
+  ● a9   Budget Edits Take Effect Tomorrow
+  ● a11  The coin box opens only on collection day
+  ...
+  killed, for the record:
+    ✕ a7   No Calendar! Every Deposit Gets Its Own Envelope!  [exists: per-deposit envelopes with no month is standard envelope budgeting]
+```
 
-## Why not just ask for novel ideas
+(Real output, from a test run on "budget-app users quit in week two".)
 
-Because asking a language model for novelty produces the *average* of what gets
-called novel, which is not novel. Three specific failures, and what this does
-about each:
+## How it works, in one paragraph
 
-| Failure | Fix |
-|---|---|
-| Asked to "pick something random," models converge on the same clichés — octopus, jazz, mycelium, origami | Entropy comes from a shipped seed file sampled with `shuf`, never from the model |
-| Given the codebase and the history, ideas drift back toward what already exists | Generators get problem context and are **denied** solution context; they never see the repo or the conversation |
-| Random inspiration becomes decoration on a standard idea | The generator prompt's litmus test: *if your idea still makes sense with the seed deleted, you failed* |
-
-The critic exists because this trade is deliberate: forcing collisions raises the
-ceiling and lowers the floor. Roughly two thirds of each wave is chaff. Someone
-has to throw it out, and it should not be you.
+You (or the session you are in) describe the problem. A script asks a cheap model for
+the ten obvious answers and puts them on a **wall**: everything you can already reach.
+Then it draws random **pressures** (forcing moves such as *remove the most essential
+part*, *solve it at the scale of a planet*, *solve it the way a lighthouse keeper
+would*) with random **seeds** from shipped lists, and has cheap model calls build one
+idea per pressure. Code throws out near-copies for free. A blind **decoy test** checks
+whether each idea really came from its seed. One careful judging call kills what is
+secretly obvious, already exists, or is noise, and names the **spark** (the underlying
+connection) of every idea. You see only the headlines. Everything ever generated stays
+in a log, so nothing repeats and nothing is lost.
 
 ## Install
 
-Copy the skill into your skills directory:
+Needs python3 (standard library only; macOS, Linux or WSL) and the `claude` CLI on
+your PATH (it is, if you use Claude Code).
 
 ```bash
 git clone https://github.com/talonbaker/imagination.git
 cp -r imagination/skills/imagination ~/.claude/skills/
+# or keep it updatable:  ln -s "$(pwd)/imagination/skills/imagination" ~/.claude/skills/imagination
 ```
 
-Or symlink it, so `git pull` keeps you current:
-
-```bash
-ln -s "$(pwd)/imagination/skills/imagination" ~/.claude/skills/imagination
-```
-
-For one project only, use `.claude/skills/` in the project root instead.
-
-Requires `shuf` (standard on Linux, and in Git Bash on Windows). On macOS
-without coreutils the skill falls back to an `awk`-based sampler automatically.
-
-*Not shipped as a plugin marketplace entry.* The single-directory copy above is
-the supported path; adding a marketplace manifest would mean guessing at a format
-this repo has not verified, and a broken manifest is worse than no manifest.
+State goes in `.imagination/` in the directory you run from. Add it to `.gitignore`
+(`echo .imagination/ >> .gitignore`), or pass `--dir PATH` to put it elsewhere.
 
 ## Use
 
-```
-/imagination novel ways to show long-running job progress in a CLI tool
-```
-
-Or — the path that matters more — invoke it **with no argument** in the middle of
-a session where you are already stuck. It distills the problem out of the
-conversation you are having and runs on that.
+In Claude Code:
 
 ```
-/imagination
+/imagination our co-op board game has a quarterback problem
+/imagination                     (mid-session: it works out the problem from the conversation)
 ```
 
-It also triggers on plain requests: *"give me some non-obvious ideas for this,"*
-*"every approach I've come up with is generic."*
+Then talk to it. Plain language works ("keep the coin box one, kill a4, more"); the
+session maps it to commands.
 
-### What a run looks like
-
-```
-10 generated, 3 survived.
-
-1. Milestone Commits
-   Mechanism: an append-only, timestamped log of phase-completion events that
-   persists across restarts and disconnects. Each new attempt shows the furthest
-   milestone any prior attempt ever reached alongside the current run's live
-   position.
-   Non-obvious: standard progress displays reset every run; this treats the
-   operation's own history as a permanent ruler, so a killed-and-restarted job
-   has a benchmark instead of starting the anxiety over from zero.
-   Prototype first: add commit-logging to a flaky migration that fails partway
-   on repeat runs.
-```
-
-Seed for that one: *"the rules are permanently altered by what happens, and never
-revert."*
-
-## Knobs
-
-| Flag | Effect |
+| You say | What happens |
 |---|---|
-| *(default)* | 10 generators, 2 seeds each, 1 critic |
-| `--deep` | 25 generators. For when a default wave came back weak, or the problem is worth real money |
-| `--n <k>` | Explicit wave size |
+| `more` | Hard reshuffle: everything shown joins the wall, fresh seeds (never reused), least-used pressures first, recent themes banned |
+| `keep a3 a9` / `kill a4 too cute` / `revive a4` | Your verdicts. Kills are never deleted, only marked |
+| `grow a7` | Six offspring from a7's spark (not its wording), via grow pressures |
+| `show a7` | What is behind the headline: pressure, seeds, bridge, spark, decoy result, verdict, lineage |
+| `deepen a7` | One careful write-up: the bridge explained, what to try first, where it is likely wrong, prior art to search |
+| `tree` | Text tree, and the path to `tree.html` |
+| `list [--all]` / `status` | Headlines by batch / where things stand and what it has cost |
+| `run --batches 3` | Unattended rounds; stops itself on convergence or a usage limit |
+| `resume` | Finishes anything interrupted |
+| `--size small/medium/large` | 6 / 12 / 24 ideas per batch (default medium) |
 
-**On cost.** Cost is per *worker* and almost flat, so the same idea count from
-fewer workers is a near-proportional saving. That is why a worker carries three
-collisions rather than one.
+You can run the script directly too: `python3 ~/.claude/skills/imagination/scripts/imagine.py --help`.
 
-| Wave | Workers | Ideas | Measured total |
-|---|---|---|---|
-| `--n 8` | 3 | 8 | 183k |
-| default | 4 | 12 | 226k, 243k (two runs) |
-| `--deep` | 8 | 24 | 424k |
+### The tree
 
-A one-collision worker costs ~37k; a three-collision worker ~42k. Three ideas for
-14% more than one is the entire argument. On Claude Code a subagent cannot be
-spawned with its tool list emptied, so each worker pays for a full agent system
-prompt regardless of writing 400 words — the cost is *input*, and the 150-word
-cap exists for critic legibility, not economy. Keep it anyway; raising it buys
-nothing.
+`tree.html` is one self-contained file (no network), light and dark. Branches
+collapse, you can filter by status, clicking a headline shows what is behind it and
+highlights its lineage, and each apple has keep / kill / grow / revive buttons that
+build a command such as `keep a22 ; kill a10 ; grow a11` in a tray at the bottom.
+**The page is read-only: it cannot change anything on disk.** Copy the tray string and
+paste it into the chat.
 
-The pre-batch design spent 419k and 442k to produce *ten* ideas. `--deep` now
-returns 24 for less than that.
+## What it costs (measured)
 
-`--deep` buys more shots on goal, not more survivors — the critic caps output at
-4 either way, and the 24-idea wave measured here returned fewer survivors (2)
-than a 12-idea wave (3). Reach for it when a default wave came back weak.
+On a Claude plan every model call counts against your usage allowance. That is why the
+script makes the model calls itself through a lean headless `claude -p` call (no tools,
+a short replaced system prompt, nothing saved) instead of spawning subagents. A
+subagent carries the whole agent system prompt: v1 measured 37-44k tokens per worker.
+A lean call has about 1.4k tokens of fixed overhead.
 
-**The batch trade, stated plainly.** Three ideas from one worker risks
-*within-worker contamination* — idea 2 quietly restating idea 1's mechanism in a
-new wrapper. Two guards contain it: sealed-assignment rules in the worker prompt
-(complete each idea before reading the next seed pair; restate prior mechanisms
-and re-derive on convergence) and the critic's duplicate test, which sees all
-ideas flattened and unattributed so convergence cannot be excused by provenance.
-Measured across the four retest runs: one worker in four converged in the first
-run, one in eight after the sealed-assignment wording was strengthened.
-Cross-worker duplicates appeared at similar rates, which says most convergence
-is driven by narrow problems rather than by batching.
+Measured in this repo's test runs (three problems, 14 batches, 68 calls), totals
+include input, cache and output tokens:
 
-## Tuning notes
+| Call | Model role | Calls | Mean tokens | Range | Mean time |
+|---|---|---|---|---|---|
+| wall (obvious answers, once per problem) | generation | 3 | 2.8k | 2.6-3.0k | 5 s |
+| worker (4 ideas) | generation | 36 | 9.4k | 7.1-13.4k | 34 s |
+| decoy test (per batch) | generation | 14 | 5.3k | 3.5-9.9k | 11 s |
+| critic (per batch) | judgment | 14 | 11.2k | 8.7-21.4k | 39 s |
+| deepen (on request) | judgment | 1 | 4.9k | - | 21 s |
 
-What was measured while building this, and what it changed:
+| Batch | Ideas | Batches measured | Mean tokens | Range | Wall-clock |
+|---|---|---|---|---|---|
+| small | 6 | 8 | 31k | 26-33k | about 1 min |
+| medium (default) | 12 | 4 | 51k | 47-54k | about 2 min |
+| large | 24 | 1 | 88k | - | about 2.5 min |
+| grow | 6 | 1 | 31k | - | about 1 min |
 
-- **Three end-to-end runs before first commit** — a UI/UX problem (CLI progress
-  display), a backend problem (cache invalidation for a small SaaS), and a
-  non-code problem (weekly team retro format). Results: 3, 3 and 4 survivors from
-  waves of 10. The kill rate of 60–70% is the design working, not the design
-  failing; it matches the roughly 1-in-3 hit rate the wave size was chosen for.
-- **The generator prompt needed no softening or hardening across those runs.**
-  The collision bound in every wave. The one amendment the runs forced was
-  operational, not creative: some harnesses cannot spawn a subagent with its tool
-  list emptied, so `Use NO tools; answer directly` is now stated in the prompt
-  itself rather than assumed from the spawn config.
-- **The critic's kill reasons are worth reading.** Across the three runs it
-  correctly identified *liveness dots per work unit* as the oldest CLI pattern
-  there is, *transaction-offset netting* as incremental view maintenance in
-  costume, and *alternating anonymous/discussion/breakout/report segments* as the
-  standard four-phase Scrum retro. All three read as fresh in isolation. That is
-  exactly the chaff the second stage exists to catch.
-- **Seed independence was verified**, not assumed: three consecutive 20-seed
-  draws overlapped by 2 of 20 — consistent with sampling 20 from 500 without
-  replacement, i.e. real RNG rather than a model's idea of one.
-- **Honest failure is a feature.** If fewer than 2 ideas survive, the skill says
-  the wave was weak and offers a re-roll. It does not pad the list to look
-  productive.
+`--no-decoy` saves the decoy line (4-10k per batch). For comparison, v1 spent 226-243k
+for a 12-idea wave, so a v2 medium batch costs about a fifth of that.
 
-### Cold-start test pass, 2026-08-13
+Two honest notes. First, about half of each worker's tokens are the model's own
+thinking (mean 4.7k of 9.4k), which the CLI does not let a script turn off; I tried
+`--effort low`, `MAX_THINKING_TOKENS=0` and an `alwaysThinkingEnabled: false` setting
+and none reduced it. Second, plans weight models differently and do not publish
+allowances in tokens, so I cannot honestly convert these numbers into "batches per
+hour of plan". The relative numbers above are what I can stand behind.
 
-The three runs above were executed by the agent that wrote the skill — the
-weakest possible test. A second agent re-ran it cold. Three runs, three problem
-shapes, all completed with no manual patching:
+## Limits, stated plainly
 
-| Run | Problem | Wave | Survived |
-|---|---|---|---|
-| 1 | co-op horror: making players *want* to leave safe light | 10 | 3 |
-| 2 | this tool's own cost problem, invoked with **no argument** | 10 | 3 |
-| 3 | solo dev drowning in unreviewed agent output (`--n 6`) | 6 | 1 |
+- **Every call counts.** Generation goes to the cheapest model alias, judgment to a
+  mid-tier one, and your main session model does almost nothing. It still costs what
+  the table says. The aliases are set in `scripts/imaginelib/backend.py` and can be
+  overridden with the `IMAGINATION_GEN_MODEL` and `IMAGINATION_JUDGE_MODEL`
+  environment variables.
+- **The HTML tree is read-only.** Keep, kill and grow happen through chat (or by
+  pasting the tray string).
+- **It cannot wake itself up.** An unattended run that hits your usage limit stops
+  with everything saved up to the last finished call. You have to start a new session
+  later and say `/imagination resume`.
+- **Prior-art checking is offline memory.** The critic kills an idea as `exists` only
+  when it can name the product or game, and its knowledge is incomplete and dated. It
+  will miss things. `deepen` lists what to search for; do the search yourself.
+- **Feasibility is a tag, never a filter.** `impossible` ideas stay alive on purpose.
+- **Run it beside your own thinking, not instead of it.** When the right answer is
+  correct-but-obvious, the critic kills it on purpose; the kill log is where you will
+  see it.
+- **Editing the skill:** Claude Code reads a skill file once per session and caches
+  it. Edit SKILL.md, re-invoke in the same session, and you silently get the old
+  version. Test edits in a fresh session, or run the script directly.
+- **Agent fallback.** If `claude` is not on PATH or the headless call fails, the
+  script writes its prompts to `.imagination/<problem>/pending/` and the session sends
+  them as subagents, then runs `ingest`. It works (tested), but it costs the ~40k
+  subagent overhead per call again and token use is invisible to the script.
 
-Three things that testing changed:
+## Extending it
 
-- **The `awk` fallback was silently broken, and only on the argument path.**
-  Claude Code substitutes dollar-sign-digit tokens in a skill file with the
-  invocation's arguments. `$0` inside the fallback became the first word of the
-  user's problem statement, so the command printed blank lines instead of seeds
-  — and the likely next move for a model holding an empty seed list is to invent
-  seeds, which destroys the whole premise while still producing plausible output.
-  Never triggered in the author's runs because `shuf` exists on their machine.
-  The fallback is now written with `paste` so no such token appears in the file
-  at all, and Step 3 now requires checking that the draw actually returned seed
-  text. (The first version of the warning contained literal `$0` examples and so
-  mangled *itself*; it is now written out in words.)
-- **The cost claim was backwards**, as measured above.
-- **Run 3 hit the honest-failure path for the first time** — 1 survivor from 6 —
-  and reported it as weak rather than padding. Run 2 exercised `[SALVAGED]`,
-  which turned a mediocre idea into the best one in the wave. Both paths work.
+- **Seeds** live in `skills/imagination/seeds/*.txt`, one per line (`#` lines are
+  comments). The highest-leverage change you can make is adding mechanisms from your
+  own field to `mechanisms.txt`: mechanisms, not nouns ("reefs grow on the skeletons
+  of their own dead", not "coral"); distinct from each other; and a few you would be
+  embarrassed to defend. The tests fail on duplicates.
+- **Pressures** live in `skills/imagination/operators.json`: an id, a name, the seed
+  pool it draws from, and a prompt template with `{seed}` (and `{wall}`). Adding one
+  needs no code change. Grow pressures are in the same file.
+- Tests: `python3 -m unittest discover -s skills/imagination/tests` (about one second;
+  uses a fake CLI, no tokens).
 
-**One limitation worth knowing before you rely on this.** In run 2 the tool was
-pointed at a real problem whose correct answer was *obvious* — batch several
-seeds into one worker to amortise a fixed startup cost. Two generators found it.
-The critic killed both, correctly by its own rules, as things a competent team
-would reach in twenty minutes. The novelty filter has no channel for
-correct-but-obvious, by design. This is a complement to ordinary problem-solving
-and a bad substitute for it: run it *beside* your own thinking, never instead.
+Design choices, jargon and known weaknesses are in [DESIGN.md](DESIGN.md).
 
-That answer turned out to be right, and it is now how the tool works — which is
-exactly why the **kill log** exists. Every non-survivor is reported back in one
-line with its kill reason (`obvious`, `costume`, `no-kernel`, `duplicate`). It
-changes nothing about what survives; it just means the correct-but-obvious answer
-gets named on its way out instead of vanishing. If the thing you actually needed
-is in that list, the tool still found it for you.
+## Lineage
 
-### Batched waves, 2026-08-13
-
-Cost measurement drove a redesign: one worker now carries three collisions
-instead of one. Four cold runs after the change, all completing unassisted:
-
-| Run | Problem | Invocation | Workers | Ideas | Survived | Tokens |
-|---|---|---|---|---|---|---|
-| A | co-op horror: wanting to leave safe light | argument | 4 | 12 | 3 | 226k |
-| B | this skill's own stale-cache problem | **no argument** | 4 | 12 | 2 | 243k |
-| C | judging your own work with fresh eyes | `--n 8` | 3 | 8 | 3 | 183k |
-| D | indie launch visibility | `--deep` | 8 | 24 | 2 | 424k |
-
-Also found and fixed in the same pass: `awk`'s bare `srand()` seeds from the
-clock at one-second granularity, so two fallback draws inside the same second
-returned identical seeds — real-looking randomness that isn't. Now seeded
-explicitly, and verified by two same-second draws returning different seeds.
-
-Not re-tested cold at the time: natural-language triggering without naming the
-skill (structurally unverifiable from inside a session that already named it),
-the `awk` fallback on a real macOS box without coreutils, whether the seeded
-fallback survives argument substitution *as delivered*, and a default-shape run
-after the sealed-assignment wording was strengthened. The last two are closed
-below.
-
-**A caching gotcha for anyone editing this skill.** Claude Code reads a skill
-file once per session and reuses it. Edit the file, invoke it again in the same
-session, and you silently get the *old* version — the run looks entirely normal.
-Any "I fixed it and retested" done in one sitting is testing the pre-edit file.
-Verified here: a re-invocation after editing served the previous body while
-`diff` confirmed the new text was on disk. Start a fresh session to test an edit,
-or execute the file's instructions from a direct read rather than the invocation.
-
-### Fresh-session verification, 2026-08-13
-
-The batched redesign was measured by the agent that built it, in a session where
-the caching gotcha above applies. That left two questions open. Both are now
-closed from a session that had never loaded the skill body.
-
-**Loader delivery: verified.** Invoking the skill served the current batched body
-— wave-shape table, three-collision worker prompt, measured cost tables — and the
-fallback line arrived intact as `awk -v seed="${RANDOM:-$$}"`. Nothing in it was
-substituted. The `paste` rewrite holds *as delivered*, not merely as written.
-
-**One more default wave, cold:**
-
-| Run | Problem | Invocation | Workers | Ideas | Survived | Tokens |
-|---|---|---|---|---|---|---|
-| E | persisting player-built structures across nights | argument | 4 | 12 | 4 | 222k |
-
-24 of 24 seeds drawn non-empty and unique, counted in the shell. All four workers
-reported zero tool calls. Kill log complete — all eight non-survivors named
-exactly once. Cost sits inside the 226k/243k band already measured.
-
-**Within-worker convergence was zero.** The wave's one duplicate kill was
-*cross*-worker: two workers who cannot see each other independently arrived at
-pay-upkeep-or-decay. That is the strengthened sealed-assignment wording holding
-on the default shape, and it is further evidence for the earlier finding — most
-apparent batch contamination is a narrow solution space rather than a worker
-riffing on itself. A duplicate kill is not automatically a batching failure, and
-reading it as one would lead you to weaken batching for no gain.
-
-Still open, unchanged: natural-language triggering without naming the skill, and
-the `awk` fallback on a real macOS box without coreutils.
-
-## The seed file
-
-`skills/imagination/seeds.txt` — 500 unique lines, each a *mechanism* (how
-something works) rather than a noun, spanning cell biology, ecology, insect
-behavior, fermentation, geology, physics, materials science, failure engineering,
-logistics, military doctrine, economics, auction theory, historical trade, law,
-linguistics, game mechanics, sports rules, music theory, cooking technique and
-theater production.
-
-"Coral reef" would be a bad seed. *"Reefs grow by building on the skeletons of
-their own dead"* is a good one, because it hands the generator a structure to
-borrow rather than an image to decorate with.
-
-Add your own domain's mechanisms if you have one — that is the single highest-
-leverage change you can make to this tool. Keep them mechanical, keep them
-distinct from each other, and keep a few you would be embarrassed to defend.
+v1 (2026-08) was a single-shot pipeline of subagents: random mechanism seeds, blind
+generators, one critic, a kill log. It established the parts v2 keeps (seeds from a
+file sampled by a real RNG, blind generators, the mandatory collision, critic kill
+reasons, salvage, honest weak-wave reporting) and measured the subagent cost that v2
+was redesigned around. Its build notes are in [docs/v1-notes.md](docs/v1-notes.md).
 
 ## License
 

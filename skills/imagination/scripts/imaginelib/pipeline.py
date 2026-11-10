@@ -5,6 +5,7 @@ first stage that has no event, so an interruption loses at most the model call
 that was in flight."""
 import os
 import random
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
 from . import backend as be
@@ -51,7 +52,8 @@ class Ctx:
             return self.agent.call(key, kind, role, system, prompt, schema, parse)
 
     def render(self):
-        render.write_all(self.dir, self.state())
+        names = {o["id"]: o["name"] for o in self.catalog["fresh"] + self.catalog["grow"]}
+        render.write_all(self.dir, self.state(), names)
 
 
 # ---- problem setup ------------------------------------------------------------
@@ -211,6 +213,12 @@ def _wall_lines(st, exclude_batch):
     return lines
 
 
+def _cand_headline(ap):
+    if "headline-long" in ap.get("flags", []):
+        return "%s   (OVER THE 8-WORD CAP: rewrite it in headline)" % ap.get("worker_headline", ap["headline"])
+    return ap["headline"]
+
+
 def stage_critic(ctx, bid):
     st = ctx.state()
     b = st.batches[bid]
@@ -225,14 +233,16 @@ def stage_critic(ctx, bid):
         d = node.get("decoy") or {}
         dec = "n/a" if d.get("pass") is None else ("pass" if d["pass"] else "fail")
         cands.append("ID %s | pressure: %s | %s\nHEADLINE: %s\nMECHANISM: %s\nBRIDGE: %s\nDECOY: %s | FLAGS: %s"
-                     % (ap["id"], ops[ap["operator"]]["name"], seed, ap["headline"], ap["mechanism"],
+                     % (ap["id"], ops[ap["operator"]]["name"], seed, _cand_headline(ap), ap["mechanism"],
                         ap["bridge"], dec, ", ".join(ap["flags"]) or "none"))
     grow = _grow_ctx(st, b)
     fixq = [(i, st.nodes[i].get("display")) for i in st.headline_fix_queue if i in st.nodes]
     verdicts, fixes, note, conv, rec = {}, [], "", False, None
     if ids:
+        seen = Counter(m for a in st.apples() if a["batch"] != bid for m in (a.get("motifs") or []))
         prompt = prompts.critic_prompt(st.brief, _wall_lines(st, bid), cands, ctx.catalog["kinds"],
-                                       grow=grow, fix_queue=fixq)
+                                       grow=grow, fix_queue=fixq,
+                                       seen_motifs=[m for m, _ in seen.most_common(30)])
         (verdicts, fixes, note, conv), rec, _ = ctx.call(
             "%s-critic" % bid, "critic", "judge", prompts.JUDGE_SYSTEM, prompt, prompts.CRITIC_SCHEMA,
             lambda raw: prompts.parse_critic(raw, set(ids)))
