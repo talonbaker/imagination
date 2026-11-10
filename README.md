@@ -89,20 +89,20 @@ a short replaced system prompt, nothing saved) instead of spawning subagents. A
 subagent carries the whole agent system prompt: v1 measured 37-44k tokens per worker.
 A lean call has about 1.4k tokens of fixed overhead.
 
-Measured in this repo's test runs (three problems, 14 batches, 68 calls), totals
+Measured in this repo's test runs (three problems, 15 batches, 72 calls), totals
 include input, cache and output tokens:
 
 | Call | Model role | Calls | Mean tokens | Range | Mean time |
 |---|---|---|---|---|---|
 | wall (obvious answers, once per problem) | generation | 3 | 2.8k | 2.6-3.0k | 5 s |
-| worker (4 ideas) | generation | 36 | 9.4k | 7.1-13.4k | 34 s |
-| decoy test (per batch) | generation | 14 | 5.3k | 3.5-9.9k | 11 s |
-| critic (per batch) | judgment | 14 | 11.2k | 8.7-21.4k | 39 s |
+| worker (4 ideas) | generation | 38 | 9.4k | 7.1-13.4k | 34 s |
+| decoy test (per batch) | generation | 15 | 5.3k | 3.5-9.9k | 11 s |
+| critic (per batch) | judgment | 15 | 11.1k | 8.7-21.4k | 39 s |
 | deepen (on request) | judgment | 1 | 4.9k | - | 21 s |
 
 | Batch | Ideas | Batches measured | Mean tokens | Range | Wall-clock |
 |---|---|---|---|---|---|
-| small | 6 | 8 | 31k | 26-33k | about 1 min |
+| small | 6 | 9 | 31k | 26-33k | about 1 min |
 | medium (default) | 12 | 4 | 51k | 47-54k | about 2 min |
 | large | 24 | 1 | 88k | - | about 2.5 min |
 | grow | 6 | 1 | 31k | - | about 1 min |
